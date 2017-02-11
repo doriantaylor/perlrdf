@@ -4,7 +4,7 @@ RDF::Trine::Store::DBI - Persistent RDF storage based on DBI
 
 =head1 VERSION
 
-This document describes RDF::Trine::Store::DBI version 1.007
+This document describes RDF::Trine::Store::DBI version 1.015
 
 =head1 SYNOPSIS
 
@@ -65,7 +65,7 @@ use RDF::Trine::Store::DBI::Pg;
 
 our $VERSION;
 BEGIN {
-	$VERSION	= "1.007";
+	$VERSION	= "1.015";
 	my $class	= __PACKAGE__;
 	$RDF::Trine::Store::STORE_CLASSES{ $class }	= $VERSION;
 }
@@ -151,11 +151,11 @@ sub new {
 		my $dsn		= shift;
 		my $user	= shift;
 		my $pass	= shift;
-		if ($dsn =~ /^DBI:mysql:/) {
+		if ($dsn =~ /^DBI:mysql:/i) {
 			$class	= 'RDF::Trine::Store::DBI::mysql';
-		} elsif ($dsn =~ /^DBI:Pg:/) {
+		} elsif ($dsn =~ /^DBI:Pg:/i) {
 			$class	= 'RDF::Trine::Store::DBI::Pg';
-		} elsif ($dsn =~ /^DBI:SQLite:/) {
+		} elsif ($dsn =~ /^DBI:SQLite:/i) {
 			$class	= 'RDF::Trine::Store::DBI::SQLite';
 			$user	= '';
 			$pass	= '';
@@ -214,7 +214,7 @@ sub nuke {
 	my $self	= shift;
 	my $dbh		= $self->dbh;
 	my $name	= $self->model_name;
-	my $id		= _mysql_hash( $name );
+	my $id		= $self->_mysql_hash( $name );
 	my $l		= Log::Log4perl->get_logger("rdf.trine.store.dbi");
 	
 	$dbh->do( "DROP TABLE Statements${id};" ) || do { $l->trace( $dbh->errstr ); return };
@@ -1215,6 +1215,9 @@ using the same algorithm that Redland's mysql storage backend uses.
 
 sub _mysql_hash;
 sub _mysql_hash_pp {
+	if (ref($_[0])) {
+		my $self = shift;
+	}
 	my $data	= encode('utf8', shift);
 	my @data	= unpack('C*', md5( $data ));
 	my $sum		= Math::BigInt->new('0');
@@ -1276,7 +1279,7 @@ sub _mysql_node_hash {
 		return;
 	}
 	my $hash;
-	$hash	= _mysql_hash( $data );
+	$hash	= $self->_mysql_hash( $data );
 	return $hash;
 }
 
@@ -1289,7 +1292,7 @@ Returns the name of the Statements table.
 sub statements_table {
 	my $self	= shift;
 	my $model	= $self->model_name;
-	my $id		= _mysql_hash( $model );
+	my $id		= $self->_mysql_hash( $model );
 	my $prefix	= $self->{statements_table_prefix};
 	return join('', $prefix, $id);
 }
@@ -1341,7 +1344,7 @@ sub make_private_predicate_view {
 	my $oldtable	= $self->statements_table;
 	my $oldpre		= $self->statements_prefix;
 	my $model		= $self->model_name;
-	my $id			= _mysql_hash( $model );
+	my $id			= $self->_mysql_hash( $model );
 	
 	my $stable		= join('', $prefix, $oldpre, $id);
 	my $predlist	= join(', ', map { $self->_mysql_node_hash( $_ ) } (@preds));
@@ -1373,7 +1376,7 @@ sub _debug {
 	my $self	= shift;
 	my $dbh		= $self->{dbh};
 	my $name	= $self->model_name;
-	my $id		= _mysql_hash( $name );
+	my $id		= $self->_mysql_hash( $name );
 	my $table	= 'Statements' . $id;
 	my $sth		= $dbh->prepare( "SELECT * FROM $table" );
 	$sth->execute;
@@ -1398,13 +1401,14 @@ sub init {
 	my $self	= shift;
 	my $dbh		= $self->dbh;
 	my $name	= $self->model_name;
-	my $id		= _mysql_hash( $name );
+	my $id		= $self->_mysql_hash( $name );
 	my $l		= Log::Log4perl->get_logger("rdf.trine.store.dbi");
+
+	local($dbh->{AutoCommit})	= 0;
 
     # postgres is selectively case-sensitive
 	unless ($self->_table_exists("Literals")
-                or $self->_table_exists('literals')) {
-		$dbh->begin_work;
+			or $self->_table_exists('literals')) {
 		$dbh->do( <<"END" ) || do { $l->trace( $dbh->errstr ); $dbh->rollback; return };
 			CREATE TABLE Literals (
 				ID NUMERIC(20) PRIMARY KEY,
@@ -1431,10 +1435,10 @@ END
 				Name text NOT NULL
 			);
 END
-		
+
 		$dbh->commit or warn $dbh->errstr;
 	}
-	
+
 	unless ($self->_table_exists("Statements${id}")
                 or $self->_table_exists("statements${id}")) {
 		$dbh->do( <<"END" ) || do { $l->trace( $dbh->errstr ); return };
@@ -1465,7 +1469,7 @@ sub _cleanup {
 	my $self	= shift;
 	if (my $dbh = $self->dbh) {
 		my $name	= $self->{model_name};
-		my $id		= _mysql_hash( $name );
+		my $id		= $self->_mysql_hash( $name );
 		if ($self->{ remove_store }) {
 			$dbh->do( "DROP TABLE `Statements${id}`;" );
 			$dbh->do( "DELETE FROM Models WHERE Name = ?", undef, $name );

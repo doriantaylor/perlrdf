@@ -7,7 +7,7 @@ RDF::Query::Plan - Executable query plan nodes.
 
 =head1 VERSION
 
-This document describes RDF::Query::Plan version 2.910.
+This document describes RDF::Query::Plan version 2.918.
 
 =head1 METHODS
 
@@ -66,7 +66,7 @@ use constant CLOSED		=> 0x04;
 
 our ($VERSION, %PLAN_CLASSES);
 BEGIN {
-	$VERSION		= '2.910';
+	$VERSION		= '2.918';
 	%PLAN_CLASSES	= (
 		service	=> 'RDF::Query::Plan::Service',
 	);
@@ -156,6 +156,7 @@ on the command line.
 
 sub explain {
 	my $self	= shift;
+# 	warn 'Explaining query plan: ' . $self->serialize();
 	my ($s, $count)	= ('  ', 0);
 	if (@_) {
 		$s		= shift;
@@ -453,6 +454,7 @@ sub generate_plans {
 								my $code	= sub {
 									return if ($done);
 									$done	= 1;
+									#warn Dumper(\@triples); # XXX
 									my $count	= $model->count_statements( $triples[0]->nodes );
 									my $lit		= RDF::Query::Node::Literal->new($count, undef, 'http://www.w3.org/2001/XMLSchema#integer');
 									my $vb	= RDF::Query::VariableBindings->new( {
@@ -564,7 +566,22 @@ sub generate_plans {
 		}
 		
 	} elsif ($type eq 'GroupGraphPattern') {
-		my @patterns	= $algebra->patterns();
+		my @input	= $algebra->patterns();
+		my @patterns;
+		while (my $a = shift(@input)) {
+			if ($a->isa('RDF::Query::Algebra::Service')) {
+				if (scalar(@input) and $input[0]->isa('RDF::Query::Algebra::Service') and $a->endpoint->value eq $input[0]->endpoint->value) {
+					my $b	= shift(@input);
+					if ($a->silent == $b->silent) {
+						my $p	= RDF::Query::Algebra::GroupGraphPattern->new( map { $_->pattern } ($a, $b) );
+						my $s	= RDF::Query::Algebra::Service->new( $a->endpoint, $p, $a->silent );
+						push(@patterns, $s);
+						next;
+					}
+				}
+			}
+			push(@patterns, $a);
+		}
 		
 		my @plans;
 		if (scalar(@patterns) == 0) {
@@ -828,6 +845,9 @@ sub generate_plans {
 		$p->label( algebra => $algebra );
 	}
 	
+	unless (scalar(@return_plans)) {
+		throw RDF::Query::Error::CompilationError (-text => "Cannot generate an execution plan for algebra of type $type", -object => $algebra);
+	}
 	return @return_plans;
 }
 
