@@ -80,20 +80,14 @@ sub new {
 	my $class	= shift;
 	my $url		= shift;
 	my $u		= RDF::Trine->default_useragent->clone;
-
-	$u->default_headers->push_header
-        ('Accept' => join(', ', qw(application/sparql-results+xml;q=0.9
-                                   application/rdf+xml;q=0.5
-                                   text/turtle;q=0.7
-                                   text/xml)));
-
+	$u->default_headers->push_header( 'Accept' => "application/sparql-results+xml;q=0.9,application/rdf+xml;q=0.5,text/turtle;q=0.7,text/xml" );
+	
 	push(@{ $u->requests_redirectable }, 'POST');
-
+	
 	my $self	= bless({
 		ua		=> $u,
 		url		=> $url,
 	}, $class);
-
 	return $self;
 }
 
@@ -545,13 +539,12 @@ sub _get_post_iterator {
 	my $self	= shift;
 	my $sparql	= shift;
 	my $ua		= $self->{ua};
-
+	
 # 	warn $sparql;
-
+	
 	my $url			= $self->{url};
 	my $req			= POST($url, [ update => $sparql ]);
 	my $response	= $ua->request($req);
-
 	if ($response->is_success) {
 		return RDF::Trine::Iterator::Boolean->new( [ 1 ] );
 	} else {
