@@ -151,17 +151,21 @@ sub new {
 		my $dsn		= shift;
 		my $user	= shift;
 		my $pass	= shift;
+		my $attr	= shift || {};
 		if ($dsn =~ /^DBI:mysql:/i) {
 			$class	= 'RDF::Trine::Store::DBI::mysql';
+			$attr   = { %$attr, %RDF::Trine::Store::DBI::mysql::ATTR };
 		} elsif ($dsn =~ /^DBI:Pg:/i) {
 			$class	= 'RDF::Trine::Store::DBI::Pg';
+			$attr   = { %$attr, %RDF::Trine::Store::DBI::Pg::ATTR };
 		} elsif ($dsn =~ /^DBI:SQLite:/i) {
 			$class	= 'RDF::Trine::Store::DBI::SQLite';
 			$user	= '';
 			$pass	= '';
+			$attr   = { %$attr, %RDF::Trine::Store::DBI::Sqlite::ATTR };
 		}
 		$l->trace("Connecting to $dsn ($user, $pass)");
-		$conn		= DBIx::Connector->new( $dsn, $user, $pass );
+		$conn		= DBIx::Connector->new( $dsn, $user, $pass, $attr );
 		unless ($conn) {
 			throw RDF::Trine::Error::DatabaseError -text => "Couldn't connect to database: " . DBI->errstr;
 		}

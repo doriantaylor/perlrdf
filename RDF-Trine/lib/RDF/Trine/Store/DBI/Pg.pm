@@ -30,6 +30,8 @@ BEGIN {
 	$RDF::Trine::Store::STORE_CLASSES{ $class }	= $VERSION;
 }
 
+my %ATTR = (pg_enable_utf8 => 0);
+
 sub _config_meta {
 	return {
 		required_keys	=> [qw(dsn username password name)],

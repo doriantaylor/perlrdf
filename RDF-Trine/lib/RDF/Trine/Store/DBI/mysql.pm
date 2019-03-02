@@ -30,6 +30,7 @@ BEGIN {
 	$RDF::Trine::Store::STORE_CLASSES{ $class }	= $VERSION;
 }
 
+my %ATTR;
 
 sub _config_meta {
 	return {
